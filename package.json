@@ -1,5 +1,5 @@
 {
-  "name": "nixpkgs-ruby",
+  "name": "nixpkgs-ruby-updater",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,7 +11,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "ROOT_PATH=versions node index.js"
+    "start": "node index.js"
   },
   "author": "",
   "license": "ISC"
