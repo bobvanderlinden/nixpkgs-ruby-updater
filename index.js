@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require('mz/fs')
 const path = require('path')
-const request = require('request-promise-native')
+const fetch = require('node-fetch')
 
 const rootPath = process.env.ROOT_PATH || process.cwd()
 
@@ -21,7 +21,8 @@ async function mkdirp(directoryPath) {
 }
 
 async function run() {
-  const responseBody = await request('https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/checksums.sha256')
+  const response = await fetch('https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/checksums.sha256')
+  const responseBody = await response.text()
   const regex = /^(\w+)  (ruby-(\d+)\.(\d+)\.(\d+)(?:-(\w+))?\.tar\.gz)$/mg
   let match
   

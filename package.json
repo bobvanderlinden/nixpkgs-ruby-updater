@@ -4,9 +4,8 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-    "eslint": "^4.18.1",
     "mz": "^2.7.0",
-    "request": "^2.85.0",
+    "node-fetch": "^2.1.2",
     "request-promise-native": "^1.0.5"
   },
   "devDependencies": {},
