@@ -5,9 +5,9 @@
   "main": "index.js",
   "dependencies": {
     "eslint": "^4.18.1",
-    "github": "^13.1.0",
-    "github-api": "^3.0.0",
-    "mz": "^2.7.0"
+    "mz": "^2.7.0",
+    "request": "^2.85.0",
+    "request-promise-native": "^1.0.5"
   },
   "devDependencies": {},
   "scripts": {

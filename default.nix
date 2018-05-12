@@ -10,5 +10,5 @@ in
 pkgs.ruby.overrideAttrs (super: rec {
   name = "ruby-${version}";
   version = versionName;
-  src = pkgs.fetchFromGitHub versionMeta;
+  src = pkgs.fetchurl versionMeta;
 })

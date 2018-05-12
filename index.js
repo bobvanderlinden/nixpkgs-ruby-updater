@@ -1,30 +1,9 @@
 #!/usr/bin/env node
-const GitHub = require('github-api')
 const fs = require('mz/fs')
 const path = require('path')
-const child_process = require('mz/child_process')
+const request = require('request-promise-native')
 
 const rootPath = process.env.ROOT_PATH || process.cwd()
-
-const github = new GitHub({
-  token: process.env.GITHUB_API_TOKEN
-})
-const repo = github.getRepo('ruby', 'ruby')
-
-repo.constructor.prototype.listTags = function(cb) {
-  return this._requestAllPages(`/repos/${this.__fullname}/tags`, null, cb);
-}
-
-async function getTags(repo) {
-  if (await fs.exists('tags.json')) {
-    const cachedJson = await fs.readFile('tags.json')
-    return JSON.parse(cachedJson)
-  }
-  const {data} = await repo.listTags()
-  const json = JSON.stringify(data)
-  await fs.writeFile('tags.json', json)
-  return data
-}
 
 async function mkdirp(directoryPath) {
   const parsedPath = path.parse(directoryPath)
@@ -42,31 +21,26 @@ async function mkdirp(directoryPath) {
 }
 
 async function run() {
-  const tags = await getTags(repo)
-  for (let tag of tags) {
-    const tagName = tag.name
-    const tarballUrl = tag.tarball_url
-    console.log(tag)
+  const responseBody = await request('https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/checksums.sha256')
+  const regex = /^(\w+)  (ruby-(\d+)\.(\d+)\.(\d+)(?:-(\w+))?\.tar\.gz)$/mg
+  let match
+  
+  while ((match = regex.exec(responseBody)) !== null) {
+    const sha256 = match[1]
+    const filename = match[2]
+    const versionSegments = Array.prototype.slice.call(match, 3).filter(segment => segment !== undefined)
+    const tarballUrl = `https://cache.ruby-lang.org/pub/ruby/${filename}`
 
-    const match = /v(\d+)\_(\d+)\_(\d+)(?:_(\w+))?/.exec(tagName)
-    if (!match) {
-      continue
-    }
-    const versionSegments = Array.prototype.slice.call(match, 1).filter(segment => segment)
-    console.log(versionSegments)
     const versionPath = path.join(rootPath, path.join.apply(null, versionSegments))
     const versionJsonPath = path.join(versionPath, 'meta.nix')
     if (await fs.exists(versionJsonPath)) {
       continue
     }
     await mkdirp(versionPath)
-    const [stdoutBuffer, stderrBuffer] = await child_process.exec(`nix-prefetch-url --type sha256 --unpack ${tarballUrl}`)
-    const stdout = stdoutBuffer.toString().trim()
+
     const content = new NixObject({
-      owner: new NixString('ruby'),
-      repo: new NixString('ruby'),
-      rev: new NixString(tagName),
-      sha256: new NixString(stdout)
+      url: new NixString(tarballUrl),
+      sha256: new NixString(sha256)
     })
     await fs.writeFile(versionJsonPath, content.toString())
 
