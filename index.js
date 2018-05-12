@@ -6,6 +6,8 @@ const nijs = require('nijs')
 
 const rootPath = process.env.ROOT_PATH || process.cwd()
 
+const naturalCompare = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'}).compare
+
 async function mkdirp(directoryPath) {
   const parsedPath = path.parse(directoryPath)
   if (parsedPath.dir !== parsedPath.root) {
@@ -24,13 +26,14 @@ async function mkdirp(directoryPath) {
 async function run() {
   const response = await fetch('https://raw.githubusercontent.com/postmodern/ruby-versions/master/ruby/checksums.sha256')
   const responseBody = await response.text()
-  const regex = /^(\w+)  (ruby-(\d+)\.(\d+)\.(\d+)(?:-(\w+))?\.tar\.gz)$/mg
+  const regex = /^(\w+)  (ruby-((\d+)\.(\d+)\.(\d+)(?:-(\w+))?)\.tar\.gz)$/mg
   let match
   
   while ((match = regex.exec(responseBody)) !== null) {
     const sha256 = match[1]
     const filename = match[2]
-    const versionSegments = Array.prototype.slice.call(match, 3).filter(segment => segment !== undefined)
+    const versionName = match[3]
+    const versionSegments = Array.prototype.slice.call(match, 4).filter(segment => segment !== undefined)
     const tarballUrl = `https://cache.ruby-lang.org/pub/ruby/${filename}`
 
     const versionPath = path.join(rootPath, path.join.apply(null, versionSegments))
@@ -40,14 +43,15 @@ async function run() {
     }
     await mkdirp(versionPath)
 
-    const content = new nijs.NixObject({
+    const content = {
+      versionName,
       url: new nijs.NixURL(tarballUrl),
       sha256: sha256
-    })
-    await fs.writeFile(versionJsonPath, content.toString())
+    }
+    await fs.writeFile(versionJsonPath, nijs.jsToIndentedNix(content, 0, true))
 
     while (versionSegments.length > 0) {
-      updateDefaultNix(path.join(rootPath, versionSegments.join(path.sep)))
+      updateDefaultNix(path.join(rootPath, ...versionSegments))
       versionSegments.pop()
     }
     updateDefaultNix(rootPath)
@@ -70,11 +74,15 @@ async function updateDefaultNix(directoryPath) {
   for(let directory of directories) {
     obj[directory] = new nijs.NixImport(new nijs.NixFile({ value: `./${directory}` }))
   }
+  if (directories.length > 0) {
+    const latest = directories.sort(((a,b) => naturalCompare(b,a)))[0]
+    obj['*'] = new nijs.NixImport(new nijs.NixFile({ value: `./${latest}` }))
+  }
   if (await fs.exists(path.join(directoryPath, 'meta.nix'))) {
     obj['meta'] = new nijs.NixImport(new nijs.NixFile({ value: './meta.nix' }))
   }
 
-  await fs.writeFile(path.join(directoryPath, 'default.nix'), nijs.jsToIndentedNix(obj, 0, true))
+  await fs.writeFile(path.join(directoryPath, 'default.nix'), nijs.jsToIndentedNix(new nijs.NixRecursiveAttrSet(obj), 0, true))
 }
 
 run()
