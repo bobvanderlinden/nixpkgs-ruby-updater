@@ -2,6 +2,7 @@
 const fs = require('mz/fs')
 const path = require('path')
 const fetch = require('node-fetch')
+const nijs = require('nijs')
 
 const rootPath = process.env.ROOT_PATH || process.cwd()
 
@@ -39,9 +40,9 @@ async function run() {
     }
     await mkdirp(versionPath)
 
-    const content = new NixObject({
-      url: new NixString(tarballUrl),
-      sha256: new NixString(sha256)
+    const content = new nijs.NixObject({
+      url: new nijs.NixURL(tarballUrl),
+      sha256: sha256
     })
     await fs.writeFile(versionJsonPath, content.toString())
 
@@ -67,70 +68,13 @@ async function updateDefaultNix(directoryPath) {
   
   const obj = {}
   for(let directory of directories) {
-    obj[directory] = new NixImport(new NixPath(`./${directory}`))
+    obj[directory] = new nijs.NixImport(new nijs.NixFile({ value: `./${directory}` }))
   }
   if (await fs.exists(path.join(directoryPath, 'meta.nix'))) {
-    obj['meta'] = new NixImport(new NixPath('./meta.nix'))
+    obj['meta'] = new nijs.NixImport(new nijs.NixFile({ value: './meta.nix' }))
   }
 
-  await fs.writeFile(path.join(directoryPath, 'default.nix'), new NixObject(obj).toString())
-}
-
-class NixImport {
-  constructor(expression) {
-    this.expression = expression
-  }
-
-  toString() {
-    return `import ${this.expression.toString()}`
-  }
-}
-
-class NixPath {
-  constructor(path) {
-    this.path = path
-  }
-
-  toString() {
-    return this.path
-  }
-}
-
-class NixString {
-  constructor(string) {
-    if (typeof string !== 'string') {
-      throw new Error('Parameter is not a string')
-    }
-    this.string = string
-  }
-
-  toString() {
-    return JSON.stringify(this.string)
-  }
-}
-
-class NixObject {
-  constructor(object) {
-    if (typeof object !== 'object') {
-      throw new Error('Parameter is not a object')
-    }
-    this.object = object
-  }
-
-  formatKey(key) {
-    if (/^[a-z]\w+$/.test(key)) {
-      return key
-    } else {
-      return new NixString(key).toString()
-    }
-  }
-
-  toString() {
-    const contents = Object.entries(this.object)
-      .map(([key, expression]) => `  ${this.formatKey(key)} = ${expression.toString()};`)
-      .join('\n')
-    return `{\n${contents}\n}`
-  }
+  await fs.writeFile(path.join(directoryPath, 'default.nix'), nijs.jsToIndentedNix(obj, 0, true))
 }
 
 run()
