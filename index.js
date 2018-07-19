@@ -52,10 +52,12 @@ async function run() {
     await fs.writeFile(versionJsonPath, nijs.jsToIndentedNix(content, 0, true))
 
     while (versionSegments.length > 0) {
-      updateDefaultNix(path.join(rootPath, ...versionSegments))
+      await updateDerivationNix(path.join(rootPath, ...versionSegments))
+      await updateDefaultNix(path.join(rootPath, ...versionSegments))
       versionSegments.pop()
     }
-    updateDefaultNix(rootPath)
+    await updateDerivationNix(rootPath)
+    await updateDefaultNix(rootPath)
   }
 }
 
@@ -80,10 +82,26 @@ async function updateDefaultNix(directoryPath) {
     obj['*'] = new nijs.NixImport(new nijs.NixFile({ value: `./${latest}` }))
   }
   if (await fs.exists(path.join(directoryPath, 'meta.nix'))) {
-    obj['meta'] = new nijs.NixImport(new nijs.NixFile({ value: './meta.nix' }))
+    obj['derivation'] = new nijs.NixFunInvocation({
+      funExpr: new nijs.NixImport(
+        new nijs.NixFile({ value: './derivation.nix' })
+      ),
+      paramExpr: new nijs.NixExpression('meta')
+    });
+    obj['meta'] = new nijs.NixImport(
+      new nijs.NixFile({ value: './meta.nix' })
+    )
   }
 
   await fs.writeFile(path.join(directoryPath, 'default.nix'), nijs.jsToIndentedNix(new nijs.NixRecursiveAttrSet(obj), 0, true))
+}
+
+async function updateDerivationNix(directoryPath) {
+  const genericFilePath = path.join(directoryPath, 'derivation.nix')
+  if (await fs.exists(genericFilePath)) {
+    return
+  }
+  await fs.writeFile(genericFilePath, nijs.jsToIndentedNix(new nijs.NixImport(new nijs.NixFile({ value: '../derivation.nix' })), 0, true))
 }
 
 run()
