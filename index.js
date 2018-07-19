@@ -45,6 +45,7 @@ async function run() {
 
     const content = {
       versionName,
+      version: versionName.split(/\.|\-/g).concat(["", "", "", ""]).slice(0, 4),
       url: new nijs.NixURL(tarballUrl),
       sha256: sha256
     }
